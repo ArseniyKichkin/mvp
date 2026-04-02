@@ -3,6 +3,7 @@ volumes:
   minio-data:
   prometheus_data:
   grafana_data:
+  inference_data:
 
 services:
   postgres:
@@ -92,6 +93,8 @@ services:
       MLFLOW_S3_ENDPOINT_URL: ${MLFLOW_S3_ENDPOINT_URL}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-minioadmin}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-minioadmin}
+    volumes:
+      - inference_data:/app/inference_preds
     networks:
       - mlflow-network
       - monitoring

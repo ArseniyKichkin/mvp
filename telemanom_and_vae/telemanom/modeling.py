@@ -1,4 +1,5 @@
 import mlflow.pyfunc
+import pandas as pd
 from keras.models import Sequential, load_model
 from keras.callbacks import History, EarlyStopping, Callback
 from keras.layers.recurrent import LSTM
@@ -6,11 +7,14 @@ from keras.layers.core import Dense, Activation, Dropout
 import numpy as np
 import os
 import logging
+import csv
+from datetime import datetime
 
 # suppress tensorflow CPU speedup warnings
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 logger = logging.getLogger('telemanom')
 
+all_windows_list = []
 
 class Model(mlflow.pyfunc.PythonModel):
     def load_context(self, context):
@@ -18,15 +22,33 @@ class Model(mlflow.pyfunc.PythonModel):
         pass
 
     def predict(self, context, model_input):
-        errors = self.lstm_model.predict(model_input)
-        print("Errors =", errors)
-        self.inference_window.append(errors[0].item())
-        print("Len of inference_window is", len(self.inference_window))
+        save_dir = "/app/inference_preds"
+        os.makedirs(save_dir, exist_ok=True)
+        filename = os.path.join(save_dir, "predictions.csv")
+        n_current_anomalies = len(self.vae_model.inference_scores)
+        prediction = self.lstm_model.predict(model_input[:,:-1,:])[0].item()
+        error = np.abs(prediction - model_input[0, -1, 0])
+        self.inference_window.append(error)
+        with open(filename, 'a') as f:
+            writer = csv.writer(f)
+            if f.tell() == 0:
+                writer.writerow(['timestamp', 'prediction', 'error', 'window_length'])
+
+            # Записываем данные
+            writer.writerow([
+                datetime.now().isoformat(),
+                prediction,
+                error,
+                len(self.inference_window)
+            ])
+        all_windows_list.append(prediction)
         if len(self.inference_window) == 50:
+            self.inference_window = pd.Series(self.inference_window).ewm(span=int(70 * 30 * 0.05)).mean().values.flatten()
             self.vae_model.test_model(self.inference_window, is_inference=True)
             self.inference_window = []
-        print("self.inference_window =", self.inference_window)
-        return self.vae_model.inference_scores
+        if len(self.vae_model.inference_scores) > n_current_anomalies:
+            return 1, self.vae_model.inference_scores
+        return 0, self.vae_model.inference_scores
 
     def __init__(self, config, run_id, channel):
         """

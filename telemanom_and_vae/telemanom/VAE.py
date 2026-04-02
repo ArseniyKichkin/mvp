@@ -125,6 +125,7 @@ class VAE(nn.Module):
                     window = errors[idx:idx + self.window_size]
                     batch_data.append(window)
                 data_batch = torch.FloatTensor(np.array(batch_data))
+                print("Data batch train = {}".format(data_batch))
                 recon_batch, mu, logvar = self(data_batch)
                 for i in range(len(recon_batch)):
                     self.mu_refs.append(mu[i])
@@ -135,7 +136,7 @@ class VAE(nn.Module):
                     score = self.score_window(window_recon=recon_batch[i], window_data=data_batch[i], mu=mu[i], logvar=logvar[i], beta=1.)
                     self.anomaly_scores.append(score.item())
 
-            self.quantile = np.quantile(self.anomaly_scores,  1.)
+            self.quantile = 2 * np.quantile(self.anomaly_scores,  1.)
             print("Quantiles: 0.9995 = {} and 1.0 = {}".format(self.quantile, np.quantile(self.anomaly_scores, 1.)))
 
 
@@ -168,7 +169,6 @@ class VAE(nn.Module):
         test_loss = 0
         n_windows = len(errors) - self.window_size + 1
         window_indices = list(range(n_windows))
-        prev_score = None
         prev_scores = deque()
         with torch.no_grad():
             for batch_start in range(0, n_windows, self.batch_size):
@@ -176,6 +176,8 @@ class VAE(nn.Module):
                 for idx in batch_indices:
                     window = errors[idx:idx + self.window_size]
                     data = torch.tensor(window, dtype=torch.float32)
+                    print("Data batch test = {}".format(data))
+
                     recon_batch, mu, logvar = self(data)
                     loss = self.loss_function(recon_batch, data, mu, logvar).item() / n_windows
                     test_loss += loss

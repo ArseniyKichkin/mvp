@@ -5,7 +5,6 @@ from pydantic import BaseModel, Field
 import mlflow
 import logging
 from typing import List, Optional, Any
-import uvicorn
 from prometheus_client import Gauge, generate_latest
 
 prediction_metric = Gauge(
@@ -13,8 +12,6 @@ prediction_metric = Gauge(
     "Last anomaly score returned by the model",
 ["model_name", "model_version"]
 )
-
-
 
 dotenv.load_dotenv()
 
@@ -46,6 +43,7 @@ class PredictionRequest(BaseModel):
 
 
 class PredictionResponse(BaseModel):
+    is_anomaly: Optional[bool]
     predictions: List[Any]
     shape: List[int]
     model_info: dict
@@ -154,8 +152,8 @@ async def predict(request: PredictionRequest):
             )
 
         # Делаем предсказания
-        predictions = model.predict(input_data)
-        logger.info(f"Предсказания получены. Форма: {predictions.shape if hasattr(predictions, 'shape') else 'scalar'}")
+        is_anomaly, predictions = model.predict(input_data)
+        logger.info(f"Предсказания получены. Is anomaly: {bool(is_anomaly)}. Форма: {predictions.shape if hasattr(predictions, 'shape') else 'scalar'}")
 
         if len(predictions) != 0:
             pred_value = predictions[-1]
@@ -173,6 +171,7 @@ async def predict(request: PredictionRequest):
             pred_list = list(predictions)
 
         return PredictionResponse(
+            is_anomaly=is_anomaly,
             predictions=pred_list,
             shape=list(predictions.shape) if hasattr(predictions, 'shape') else [],
             model_info={
@@ -198,7 +197,7 @@ async def predict_batch(requests: List[PredictionRequest]):
     for i, req in enumerate(requests):
         try:
             input_data = np.array(req.data)
-            predictions = model.predict(input_data)
+            is_anomaly, predictions = model.predict(input_data)
 
             if hasattr(predictions, 'tolist'):
                 pred_list = predictions.tolist()
