@@ -7,8 +7,8 @@ __pycache__/
 
 venv/
 env/
-.env/
-telemanom_and_vae/.env
+telemanom_and_vae/.env/
+telemanom_and_vae/telemanom/.env
 venv-3.7/
 .venv/
 

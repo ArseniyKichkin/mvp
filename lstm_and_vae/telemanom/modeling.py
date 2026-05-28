@@ -58,7 +58,7 @@ class Model(mlflow.pyfunc.PythonModel):
             config (obj): Config object containing parameters for processing
                 and model training
             run_id (str): Datetime referencing set of predictions in use
-            channel (obj): Channel class object containing train/test data
+            channel (obj): Channel class object containing train/test model_data
                 for X,y for a single channel
 
         Attributes:
@@ -106,7 +106,7 @@ class Model(mlflow.pyfunc.PythonModel):
         Train LSTM model according to specifications in config.yaml.
 
         Args:
-            channel (obj): Channel class object containing train/test data
+            channel (obj): Channel class object containing train/test model_data
                 for X,y for a single channel
         """
 
@@ -213,10 +213,10 @@ class Model(mlflow.pyfunc.PythonModel):
 
     def batch_predict(self, channel):
         """
-        Used trained LSTM model to predict test data arriving in batches.
+        Used trained LSTM model to predict test model_dataarriving in batches.
 
         Args:
-            channel (obj): Channel class object containing train/test data
+            channel (obj): Channel class object containing train/test model_data
                 for X,y for a single channel
 
         Returns:
@@ -229,7 +229,7 @@ class Model(mlflow.pyfunc.PythonModel):
             raise ValueError('l_s ({}) too large for stream length {}.'
                              .format(self.config.l_s, channel.y_test.shape[0]))
 
-        # simulate data arriving in batches, predict each batch
+        # simulate model_data arriving in batches, predict each batch
         for i in range(0, num_batches + 1):
             prior_idx = i * self.config.batch_size
             idx = (i + 1) * self.config.batch_size
@@ -252,10 +252,10 @@ class Model(mlflow.pyfunc.PythonModel):
 
     def batch_predict_during_train(self, channel):
         """
-        Used trained LSTM model to predict train data arriving in batches.
+        Used trained LSTM model to predict train model_data arriving in batches.
 
         Args:
-            channel (obj): Channel class object containing train/test data
+            channel (obj): Channel class object containing train/test model_data
                 for X,y for a single channel
 
         Returns:
@@ -268,7 +268,7 @@ class Model(mlflow.pyfunc.PythonModel):
             raise ValueError('l_s ({}) too large for stream length {}.'
                              .format(self.config.l_s, channel.y_train.shape[0]))
 
-        # simulate data arriving in batches, predict each batch
+        # simulate model_data arriving in batches, predict each batch
         for i in range(0, num_batches + 1):
             prior_idx = i * self.config.batch_size
             idx = (i + 1) * self.config.batch_size

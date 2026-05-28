@@ -11,11 +11,13 @@ from telemanom.channel import Channel
 from telemanom.modeling import Model
 from telemanom.VAE import VAE
 import mlflow
-import mlflow.keras
+import dotenv
 
+dotenv.load_dotenv()
 logger = helpers.setup_logging()
-base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
+mlflow.set_tracking_uri(
+    "http://localhost:5000"
+)
 
 class Detector:
     def __init__(self, labels_path=None, result_path='results/',
@@ -56,12 +58,7 @@ class Detector:
             'false_negatives': 0
         }
 
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        print("Base dir = ", base_dir)
-        config_file = os.path.join(base_dir, 'config.yaml')
-        self.config = Config(config_file)
-
-        # self.config = Config(config_path)
+        self.config = Config(config_path)
         self.y_hat = None
 
         if not self.config.predict and self.config.use_id:
@@ -79,12 +76,10 @@ class Detector:
 
         self.result_path = result_path
 
-
-
         if self.labels_path:
             self.chan_df = pd.read_csv(labels_path)
         else:
-            chan_ids = [x.split('.')[0] for x in os.listdir(os.path.join(base_dir, 'data/test/'))]
+            chan_ids = [x.split('.')[0] for x in os.listdir('data/test/')]
             self.chan_df = pd.DataFrame({"chan_id": chan_ids})
 
         logger.info("{} channels found for processing."
@@ -205,84 +200,92 @@ class Detector:
         """
         Initiate processing for all channels.
         """
+        with mlflow.start_run():
+            for i, row in self.chan_df.iterrows():
+                logger.info('Stream # {}: {}'.format(i+1, row.chan_id))
+                channel = Channel(self.config, row.chan_id)
+                channel.load_data()
 
-        mlflow.start_run(run_name="my_model_run")
+                if self.config.predict:
+                    model = Model(self.config, self.id, channel)
+                    channel = model.batch_predict_during_train(channel)
+                    channel = model.batch_predict(channel)
+                else:
+                    channel.y_hat = np.load(os.path.join('data', self.id, 'y_hat',
+                                                         '{}.npy'
+                                                         .format(channel.id)))
 
-        for i, row in self.chan_df.iterrows():
-            logger.info('Stream # {}: {}'.format(i+1, row.chan_id))
-            channel = Channel(self.config, row.chan_id)
-            channel.load_data()
-            model = None
-            if self.config.predict:
-                model = Model(self.config, self.id, channel)
-                channel = model.batch_predict_during_train(channel)
-                channel = model.batch_predict(channel)
-            else:
-                channel.y_hat = np.load(os.path.join('data', self.id, 'y_hat',
-                                                     '{}.npy'
-                                                     .format(channel.id)))
+                errors = Errors(channel, self.config, self.id)
 
-            errors = Errors(channel, self.config, self.id)
+                # train VAE here
+                # replace ```errors.process_batches(channel)``` with inference of VAE on ```errors```
+                # ELBO loss will serve as both train loss and anomaly score
+                vae = VAE(errors.e_s_train, config=self.config)
+                model.vae_model = vae
+                model.vae_model.test_model(errors.e_s)
+                # reconstruction_loss = vae.train_loss
+                # errors.process_batches(channel)
+                model.vae_model.mitigate_fp()
+                errors.E_seq = model.vae_model.anomaly_sequences
 
-            # train VAE here
-            # replace ```errors.process_batches(channel)``` with inference of VAE on ```errors```
-            # ELBO loss will serve as both train loss and anomaly score
-            vae = VAE(errors.e_s_train, config=self.config)
-            vae.test_model(errors.e_s)
-            # reconstruction_loss = vae.train_loss
-            # errors.process_batches(channel)
-            vae.mitigate_fp()
-            errors.E_seq = vae.anomaly_sequences
+                result_row = {
+                    'run_id': self.id,
+                    'chan_id': row.chan_id,
+                    'num_train_values': len(channel.X_train),
+                    'num_test_values': len(channel.X_test),
+                    'test_losses': model.vae_model.test_losses,
+                    'n_predicted_anoms': len(model.vae_model.anomaly_sequences),
+                    'normalized_pred_error': errors.normalized,
+                    'anom_scores': errors.anom_scores # max(model.vae_model.anomaly_scores)
+                }
+                # result_row = {
+                #     'run_id': self.id,
+                #     'chan_id': row.chan_id,
+                #     'num_train_values': len(channel.X_train),
+                #     'num_test_values': len(channel.X_test),
+                #     'n_predicted_anoms': len(errors.E_seq),
+                #     'normalized_pred_error': errors.normalized,
+                #     'anom_scores': errors.anom_scores
+                # }
 
-            result_row = {
-                'run_id': self.id,
-                'chan_id': row.chan_id,
-                'num_train_values': len(channel.X_train),
-                'num_test_values': len(channel.X_test),
-                'test_losses': vae.test_losses,
-                'n_predicted_anoms': len(vae.anomaly_sequences),
-                'normalized_pred_error': errors.normalized,
-                'anom_scores': max(vae.anomaly_scores) # errors.anom_scores
-            }
+                if self.labels_path:
+                    result_row = {**result_row,
+                                  **self.evaluate_sequences(errors, row)}
+                    result_row['spacecraft'] = row['spacecraft']
+                    result_row['anomaly_sequences'] = row['anomaly_sequences']
+                    result_row['class'] = row['class']
+                    self.results.append(result_row)
 
-            if self.labels_path:
-                result_row = {**result_row,
-                              **self.evaluate_sequences(errors, row)}
-                result_row['spacecraft'] = row['spacecraft']
-                result_row['anomaly_sequences'] = row['anomaly_sequences']
-                result_row['class'] = row['class']
-                self.results.append(result_row)
+                    logger.info('Total true positives: {}'
+                                .format(self.result_tracker['true_positives']))
+                    logger.info('Total false positives: {}'
+                                .format(self.result_tracker['false_positives']))
+                    logger.info('Total false negatives: {}\n'
+                                .format(self.result_tracker['false_negatives']))
 
-                logger.info('Total true positives: {}'
-                            .format(self.result_tracker['true_positives']))
-                logger.info('Total false positives: {}'
-                            .format(self.result_tracker['false_positives']))
-                logger.info('Total false negatives: {}\n'
-                            .format(self.result_tracker['false_negatives']))
+                else:
+                    result_row['anomaly_sequences'] = vae.anomaly_sequences # errors.E_seq
+                    self.results.append(result_row)
 
-            else:
-                result_row['anomaly_sequences'] = vae.anomaly_sequences#errors.E_seq
-                self.results.append(result_row)
+                    logger.info('{} anomalies found'
+                                .format(result_row['n_predicted_anoms']))
+                    logger.info('anomaly sequences start/end indices: {}'
+                                .format(result_row['anomaly_sequences']))
+                    logger.info('number of test values: {}'
+                                .format(result_row['num_test_values']))
+                    logger.info('anomaly scores: {}\n'
+                                .format(result_row['anom_scores']))
 
-                # logger.info('{} anomalies found'
-                #             .format(result_row['n_predicted_anoms']))
-                # logger.info('anomaly sequences start/end indices: {}'
-                #             .format(result_row['anomaly_sequences']))
-                logger.info('number of test values: {}'
-                            .format(result_row['num_test_values']))
-                # logger.info('anomaly scores: {}\n'
-                #             .format(result_row['anom_scores']))
-
-            self.result_df = pd.DataFrame(self.results)
-            self.result_df.to_csv(
-                os.path.join(base_dir, self.result_path, '{}.csv'.format(self.id)),
-                index=False)
-
-        mlflow.keras.log_model(
-            keras_model=model,
-            artifact_path="model",
-            registered_model_name="drift-model",  # если хочешь зарегистрировать в MLflow Model Registry
-            keras_module="keras"  # явно указываем модуль, чтобы MLflow не пытался догадаться
-        )
-        mlflow.end_run()
-        self.log_final_stats()
+                self.result_df = pd.DataFrame(self.results)
+                self.result_df.to_csv(
+                    os.path.join(self.result_path, '{}.csv'.format(self.id)),
+                    index=False)
+            self.log_final_stats()
+            mlflow.pyfunc.log_model(
+                python_model=model,
+                artifact_path='drift_model',
+                registered_model_name='drift_model'
+            )
+            # mlflow.pyfunc.load_model('s3://mlflow/model/drift_model/latest')
+            # run_uri = f"runs/{mlflow.active_run().info.run_id}/drift_model"
+            # mlflow.register_model(run_uri, 'drift_model')

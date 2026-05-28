@@ -26,8 +26,8 @@ class Channel:
                 [timesteps, n_predictions, 1)
             y_test (arr): actual channel test values with dimensions
                 [timesteps, n_predictions, 1)
-            train (arr): train data loaded from .npy file
-            test(arr): test data loaded from .npy file
+            train (arr): train model_data loaded from .npy file
+            test(arr): test model_data loaded from .npy file
         """
 
         self.id = chan_id
@@ -49,8 +49,8 @@ class Channel:
         Args:
             arr (np array): array of input streams with
                 dimensions [timesteps, 1, input dimensions]
-            train (bool): If shaping training data, this indicates
-                data can be shuffled
+            train (bool): If shaping training model_data, this indicates
+                model_data can be shuffled
         """
 
         data = []
@@ -69,7 +69,7 @@ class Channel:
 
     def load_data(self):
         """
-        Load train and test data from local.
+        Load train and test model_data from local.
         """
         try:
             self.train = np.load(os.path.join(base_dir, "data", "train", "{}.npy".format(self.id)))

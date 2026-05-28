@@ -1,5 +1,0 @@
-outs:
-- md5: 9bd154fe00c16a5385d61f910d8c73e6
-  size: 112491372
-  hash: md5
-  path: user_sessions.parquet

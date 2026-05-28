@@ -49,7 +49,7 @@ From root of repo, curl and unzip data:
 pip install kaggle 
 
 # make sure you have an Kaggle API key setup, then: 
-kaggle datasets download -d patrickfleith/nasa-anomaly-detection-dataset-smap-msl && mv nasa-anomaly-detection-dataset-smap-msl.zip data.zip && unzip -o data.zip && rm data.zip && mv data/data tmp && rm -r data && mv tmp data
+kaggle datasets download -d patrickfleith/nasa-anomaly-detection-dataset-smap-msl && mv nasa-anomaly-detection-dataset-smap-msl.zip model_data.zip && unzip -o model_data.zip && rm model_data.zip && mv model_data/model_data tmp && rm -r model_data && mv tmp model_data
 ``` 
 
 Install dependencies using **python 3.6+** (recommend using a virtualenv):

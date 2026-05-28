@@ -125,7 +125,6 @@ class VAE(nn.Module):
                     window = errors[idx:idx + self.window_size]
                     batch_data.append(window)
                 data_batch = torch.FloatTensor(np.array(batch_data))
-                print("Data batch train = {}".format(data_batch))
                 recon_batch, mu, logvar = self(data_batch)
                 for i in range(len(recon_batch)):
                     self.mu_refs.append(mu[i])
@@ -150,7 +149,7 @@ class VAE(nn.Module):
         for i in range(len(self.anomaly_sequences)):
             e_max.append((i, self.test_anomaly_scores[i]))
         e_max = sorted(e_max, key=lambda x: -x[1])
-        e_max.append((len(e_max), torch.tensor(self.max_normal_score)))
+        e_max.append((-1, torch.tensor(self.max_normal_score)))
         start_of_mitigate = len(self.anomaly_sequences) - 1
         for i in range(1, len(e_max)):
             e_max_prev = e_max[i - 1][-1].item()
@@ -158,8 +157,14 @@ class VAE(nn.Module):
             if (e_max_prev - e_max_cur) / e_max_prev > self.p:
                 start_of_mitigate = i
         for i in range(start_of_mitigate, len(e_max) - 1):
-            self.anomaly_sequences.remove(anomaly_seqs[e_max[i][0]])
-            num_seqs_removed += 1
+            idx = e_max[i][0]
+
+            if idx >= len(anomaly_seqs) or idx < 0:
+                continue
+
+            if anomaly_seqs[idx] in self.anomaly_sequences:
+                self.anomaly_sequences.remove(anomaly_seqs[idx])
+                num_seqs_removed += 1
         print('Mitigated {} sequences'.format(num_seqs_removed))
 
 
@@ -176,7 +181,6 @@ class VAE(nn.Module):
                 for idx in batch_indices:
                     window = errors[idx:idx + self.window_size]
                     data = torch.tensor(window, dtype=torch.float32)
-                    print("Data batch test = {}".format(data))
 
                     recon_batch, mu, logvar = self(data)
                     loss = self.loss_function(recon_batch, data, mu, logvar).item() / n_windows
@@ -187,10 +191,8 @@ class VAE(nn.Module):
                         self.max_normal_score = score
                     if self.window_size * len(prev_scores) > self.buffer:
                         prev_scores.popleft()
-                    # with open('output.txt', 'a') as f:
-                    #     f.write("Score = {}, window = {}, start = {}, end = {}\n".format(score, window, idx,
-                    #                                                                      idx + self.window_size))
-                    if (score > self.quantile ) or math.isnan(score): #or abs(score - prev_score) / score > 0.2:
+
+                    if (score > self.quantile ) or math.isnan(score):
                         if len(self.anomaly_sequences) != 0 and (idx - self.anomaly_sequences[-1][-1] + self.window_size - 1) <= self.buffer:
                             self.anomaly_sequences[-1][-1] = idx + self.window_size - 1 + self.config.l_s
                             if score > self.test_anomaly_scores[-1]:
@@ -203,7 +205,6 @@ class VAE(nn.Module):
                             self.inference_scores.append(score.item())
                             print("Inference called!!!")
                     self.test_losses.append(test_loss)
-                    # print('Testing: loss = {}.\tStart = {}\tEnd = {}'.format(self.loss_function(
-                    #     recon_batch, data, mu, logvar).item(), idx, idx + self.window_size))
+
 
             print('====> Test set loss: {:.4f}'.format(test_loss))

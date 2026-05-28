@@ -124,7 +124,7 @@ async def predict(request: PredictionRequest):
 
     Ожидает данные в формате:
     {
-        "data": [[0.1, 0.2, ...], [0.3, 0.4, ...]],
+        "model_data": [[0.1, 0.2, ...], [0.3, 0.4, ...]],
         "batch_size": 100
     }
 

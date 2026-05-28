@@ -46,7 +46,7 @@ class Plotter:
             _min (float): min y value of series
             _max (float): max y value of series
             plot_values (dict): dictionary of different series to be plotted
-                (predicted, actual, errors, training data)
+                (predicted, actual, errors, training model_data)
 
         Returns:
             (dict) shape specifications for plotly
@@ -114,10 +114,10 @@ class Plotter:
         Print results for a channel.
 
         Args:
-            channel (obj): Channel class object containing train/test data
+            channel (obj): Channel class object containing train/test model_data
                 for X,y for a single channel
             plot_values (dict): dictionary of different series to be plotted
-                (predicted, actual, errors, training data)
+                (predicted, actual, errors, training model_data)
         """
 
         if 'spacecraft' in channel:
@@ -154,20 +154,20 @@ class Plotter:
 
         Args:
             channel_id (str): channel id
-            plot_train (bool): If true, plot training data in separate plot
+            plot_train (bool): If true, plot training model_data in separate plot
             plot_errors (bool): If true, plot prediction errors in separate plot
         """
         channel = self.result_df[self.result_df['chan_id'] == channel_id]
 
         plot_values = {
-            'y_hat': np.load(os.path.join('..', 'data', self.run_id, 'y_hat',
+            'y_hat': np.load(os.path.join('..', 'model_data', self.run_id, 'y_hat',
                                           '{}.npy'.format(channel_id))),
-            'smoothed_errors': np.load(os.path.join('..', 'data', self.run_id,
+            'smoothed_errors': np.load(os.path.join('..', 'model_data', self.run_id,
                                                     'smoothed_errors',
                                                     '{}.npy'.format(channel_id))),
-            'test': np.load(os.path.join('..', 'data', 'test', '{}.npy'
+            'test': np.load(os.path.join('..', 'model_data', 'test', '{}.npy'
                                          .format(channel_id))),
-            'train': np.load(os.path.join('..', 'data', 'train', '{}.npy'
+            'train': np.load(os.path.join('..', 'model_data', 'train', '{}.npy'
                                           .format(channel_id)))
         }
 
@@ -230,7 +230,7 @@ class Plotter:
         Loop through all channels and plot.
 
         Args:
-            plot_train (bool): If true, plot training data in separate plot
+            plot_train (bool): If true, plot training model_data in separate plot
             plot_errors (bool): If true, plot prediction errors in separate plot
         """
 

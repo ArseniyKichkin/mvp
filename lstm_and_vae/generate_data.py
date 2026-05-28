@@ -8,7 +8,7 @@ TRAIN_LEN = 5000
 TEST_LEN = 3000
 INPUT_DIM = 1
 
-SAVE_DIR = "data"
+SAVE_DIR = "model_data"
 TRAIN_DIR = os.path.join(SAVE_DIR, "train")
 TEST_DIR = os.path.join(SAVE_DIR, "test")
 
