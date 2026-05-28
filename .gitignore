@@ -35,4 +35,4 @@ mlruns/
 
 *.egg-info/
 dist/
-build/
+build/.ipynb_checkpoints/
