@@ -68,7 +68,6 @@ class Detector:
 
         helpers.make_dirs(self.id)
 
-        # add logging FileHandler based on ID
         hdlr = logging.FileHandler('data/logs/%s.log' % self.id)
         formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
         hdlr.setFormatter(formatter)
@@ -188,12 +187,6 @@ class Detector:
             logger.info('-----------------')
             logger.info('Total channel sets evaluated: {}'
                         .format(len(self.result_df)))
-            # logger.info('Total anomalies found: {}'
-            #             .format(self.result_df['n_predicted_anoms'].sum()))
-            # logger.info('Avg normalized prediction error: {}'
-            #             .format(self.result_df['normalized_pred_error'].mean()))
-            # logger.info('Total number of values evaluated: {}'
-            #             .format(self.result_df['num_test_values'].sum()))
 
 
     def run(self):
@@ -217,14 +210,10 @@ class Detector:
 
                 errors = Errors(channel, self.config, self.id)
 
-                # train VAE here
-                # replace ```errors.process_batches(channel)``` with inference of VAE on ```errors```
-                # ELBO loss will serve as both train loss and anomaly score
                 vae = VAE(errors.e_s_train, config=self.config)
                 model.vae_model = vae
                 model.vae_model.test_model(errors.e_s)
-                # reconstruction_loss = vae.train_loss
-                # errors.process_batches(channel)
+
                 model.vae_model.mitigate_fp()
                 errors.E_seq = model.vae_model.anomaly_sequences
 
@@ -236,17 +225,8 @@ class Detector:
                     'test_losses': model.vae_model.test_losses,
                     'n_predicted_anoms': len(model.vae_model.anomaly_sequences),
                     'normalized_pred_error': errors.normalized,
-                    'anom_scores': errors.anom_scores # max(model.vae_model.anomaly_scores)
+                    'anom_scores': errors.anom_scores
                 }
-                # result_row = {
-                #     'run_id': self.id,
-                #     'chan_id': row.chan_id,
-                #     'num_train_values': len(channel.X_train),
-                #     'num_test_values': len(channel.X_test),
-                #     'n_predicted_anoms': len(errors.E_seq),
-                #     'normalized_pred_error': errors.normalized,
-                #     'anom_scores': errors.anom_scores
-                # }
 
                 if self.labels_path:
                     result_row = {**result_row,
@@ -264,7 +244,7 @@ class Detector:
                                 .format(self.result_tracker['false_negatives']))
 
                 else:
-                    result_row['anomaly_sequences'] = vae.anomaly_sequences # errors.E_seq
+                    result_row['anomaly_sequences'] = vae.anomaly_sequences
                     self.results.append(result_row)
 
                     logger.info('{} anomalies found'
@@ -286,6 +266,3 @@ class Detector:
                 artifact_path='drift_model',
                 registered_model_name='drift_model'
             )
-            # mlflow.pyfunc.load_model('s3://mlflow/model/drift_model/latest')
-            # run_uri = f"runs/{mlflow.active_run().info.run_id}/drift_model"
-            # mlflow.register_model(run_uri, 'drift_model')
