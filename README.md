@@ -92,6 +92,22 @@
 
 ## 9. Как запускать
 
+1. ```bash
+      git clone git@github.com:ArseniyKichkin/mvp.git
+   ```
+2. cd mvp/mlflow/docker-compose/
+3. Создайте файл .env с переменными окружения по примеру .env.dev.example
+4. ```bash
+      export $(cat .env | xargs)
+   ```
+5. ```bash
+      docker compose up -d
+   ```
+6. Сервис инференса принимает POST-запросы на 5001 порту
+7. ```bash
+      cd ~/mvp/
+   ```
+
 ## 10. Планы на будущее
 
 1. Реализовать алертинг, если, например, в системе мониторинга продолжительное время наблюдается высокое значение anomaly score
