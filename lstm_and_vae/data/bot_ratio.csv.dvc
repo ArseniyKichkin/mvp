@@ -1,0 +1,5 @@
+outs:
+- md5: 0822126c8da9f7d2eadc992e6dfa0e6d
+  size: 35
+  hash: md5
+  path: bot_ratio.csv

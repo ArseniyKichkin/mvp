@@ -1,0 +1,23 @@
+FROM --platform=linux/amd64 python:3.7.17-slim-buster
+
+WORKDIR /app
+
+COPY requirements.txt .env /app/
+
+RUN pip install --upgrade \
+    "pip<23" \
+    "setuptools<60" \
+    "wheel<0.38"
+
+RUN cd /app/ && \
+pip install -r requirements.txt && \
+pip uninstall -y protobuf && \
+pip install protobuf==3.20.3
+
+COPY test.py /app/
+
+COPY ./telemanom/ /app/telemanom/
+
+EXPOSE 8000
+
+CMD ["uvicorn", "test:app", "--host", "0.0.0.0", "--port", "8000"]
